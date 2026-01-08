@@ -5,7 +5,7 @@ from scipy.stats import norm, chi2
 import matplotlib.pyplot as plt
 
 # --- PAGE SETUP ---
-st.set_page_config(page_title="Market Risk Model", layout="wide")
+st.set_page_config(page_title="testing_Market Risk Model", layout="wide")
 st.title("🛡️ Quantitative Risk Model (VaR & CVaR)")
 st.markdown("Enter a stock ticker to calculate Downside Risk, Sortino Ratio, and Fat Tail events.")
 

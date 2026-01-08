@@ -111,12 +111,13 @@ def calculate_market_risk(symbol, position_size_usd):
 
         one_day_var_percent_gain = daily_upside_vol * z_score
         one_day_var_dollar_gain = position_size_usd * one_day_var_percent_gain 
-            cutoff = -one_day_var_percent
-            worst_days = returns[returns < cutoff]
-            if len(worst_days) > 0:
+        cutoff = -one_day_var_percent
+        worst_days = returns[returns < cutoff]
+            
+        if len(worst_days) > 0:
                 cvar_percent = worst_days.mean()
-            else:
-                cvar_percent = -daily_vol * (norm.pdf(z_score) / norm.cdf(-z_score))
+        else:
+            cvar_percent = -daily_vol * (norm.pdf(z_score) / norm.cdf(-z_score))
             cvar_dollar = position_size_usd * cvar_percent
 
             # --- DISPLAY ---

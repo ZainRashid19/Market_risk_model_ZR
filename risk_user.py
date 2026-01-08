@@ -1,15 +1,15 @@
 import streamlit as st
 import yfinance as yf
 import numpy as np
-from scipy.stats import norm, chi2
+from scipy.stats import norm
 import matplotlib.pyplot as plt
 
 # --- PAGE SETUP ---
-st.set_page_config(page_title="testing_Market Risk Model", layout="wide")
+st.set_page_config(page_title="newtest_Market Risk Model", layout="wide")
 st.title("🛡️ Quantitative Risk Model (VaR & CVaR)")
 st.markdown("Enter a stock ticker to calculate Downside Risk, Sortino Ratio, and Fat Tail events.")
 
-# --- 1. CACHED DATA DOWNLOAD (The Speed Boost) ---
+# --- 1. CACHED DATA DOWNLOAD ---
 @st.cache_data
 def get_stock_data(symbol):
     """Downloads data and caches it so the app is fast."""
@@ -28,6 +28,7 @@ def plot_graph(returns, var_cutoff_percent, symbol):
     ax.bar(neg_returns.index, neg_returns, color="red", alpha=0.5, label="Down Days")
     ax.axhline(y=-var_cutoff_percent, color="darkred", linestyle="--", linewidth=2, label=f"VaR Limit ({-var_cutoff_percent:.1%})")
 
+    # Highlight failures (days worse than VaR)
     failures = returns[returns < -var_cutoff_percent]
     ax.scatter(failures.index, failures, color="black", edgecolors="black", s=60, zorder=5, label="Failures")
 
@@ -47,9 +48,12 @@ def backtest(returns, confidence_level=0.95):
     daily_vol = returns.std()
     var_cutoff_percent = daily_vol * z_score
 
+    # Count how many times we actually crashed worse than the model predicted
     actual_failures = returns[returns < -var_cutoff_percent]
     num_failures = len(actual_failures)
     total_days = len(returns)
+    
+    # Expected failures based on confidence level
     expected_failure_rate = 1 - confidence_level
     expected_failures = total_days * expected_failure_rate
 
@@ -69,58 +73,58 @@ def calculate_market_risk(symbol, position_size_usd):
                 st.error(f"❌ No data found for {symbol}")
                 return
 
-            #Volatility formula
-        history['Log_Returns'] = np.log(history['Close']/history['Close'].shift(1))
-        returns = history['Log_Returns'].dropna()
+            # Volatility formula
+            history['Log_Returns'] = np.log(history['Close']/history['Close'].shift(1))
+            returns = history['Log_Returns'].dropna()
 
-        daily_vol = returns.std()
-        weekly_vol = daily_vol * np.sqrt(5)
-        annual_vol = daily_vol * np.sqrt(252)
-        # 252 is std # of trading days in the US Stock market
+            daily_vol = returns.std()
+            weekly_vol = daily_vol * np.sqrt(5)
+            annual_vol = daily_vol * np.sqrt(252)
 
-        # calculating the neg returns of the stock
-        negative_returns = returns.copy()
-        #ignores pos days 
-        negative_returns[negative_returns>0]=0
-        daily_downside_vol = np.sqrt(np.mean(negative_returns**2))
-        weekly_downside_vol = daily_downside_vol * np.sqrt(5)
-        annual_downside_vol = daily_downside_vol * np.sqrt(252)
+            # Calculating negative returns (Downside Volatility)
+            negative_returns = returns.copy()
+            negative_returns[negative_returns > 0] = 0
+            daily_downside_vol = np.sqrt(np.mean(negative_returns**2))
+            annual_downside_vol = daily_downside_vol * np.sqrt(252)
 
+            # Calculating positive returns (Upside Volatility)
+            positive_returns = returns.copy()
+            positive_returns[positive_returns < 0] = 0
+            daily_upside_vol = np.sqrt(np.mean(positive_returns**2))
+            annual_upside_vol = daily_upside_vol * np.sqrt(252)
 
-        # calculating the pos returns of the stock
-        positive_returns = returns.copy()
-        #ignore the neg days 
-        positive_returns[positive_returns<0]=0
-        daily_upside_vol = np.sqrt(np.mean(positive_returns**2))
-        weekly_upside_vol = daily_upside_vol * np.sqrt(5)
-        annual_upside_vol = daily_upside_vol * np.sqrt(252)
-
-        #Sortino ratio 
-
-        avg_daily_returns = returns.mean()
-        annual_returns = avg_daily_returns*252
-        sortino_ratio = annual_returns/annual_downside_vol
-        
-        #95% confidence or 1.645 one tailed  z score 
-        confidence_level = 0.95 
-        z_score = norm.ppf(confidence_level)
-        
-        #VaR's
-        one_day_var_percent = daily_vol * z_score
-        one_day_var_dollar = position_size_usd * one_day_var_percent
-
-        one_day_var_percent_gain = daily_upside_vol * z_score
-        one_day_var_dollar_gain = position_size_usd * one_day_var_percent_gain 
-        cutoff = -one_day_var_percent
-        worst_days = returns[returns < cutoff]
+            # Sortino ratio 
+            avg_daily_returns = returns.mean()
+            annual_returns = avg_daily_returns * 252
             
-        if len(worst_days) > 0:
-                cvar_percent = worst_days.mean()
-        else:
-            cvar_percent = -daily_vol * (norm.pdf(z_score) / norm.cdf(-z_score))
+            # Avoid division by zero if downside vol is 0
+            if annual_downside_vol != 0:
+                sortino_ratio = annual_returns / annual_downside_vol
+            else:
+                sortino_ratio = 0
+
+            # 95% confidence or 1.645 one tailed z score 
+            confidence_level = 0.95 
+            z_score = norm.ppf(confidence_level)
+            
+            # VaR Calculations
+            one_day_var_percent = daily_vol * z_score
+            one_day_var_dollar = position_size_usd * one_day_var_percent
+
+            # CVaR (Expected Shortfall)
+            cutoff = -one_day_var_percent
+            worst_days = returns[returns < cutoff]
+                
+            if len(worst_days) > 0:
+                # Empirical CVaR (Average of the worst days)
+                cvar_percent = abs(worst_days.mean())
+            else:
+                # Theoretical CVaR (Normal Distribution approximation) if no historical failures
+                cvar_percent = daily_vol * (norm.pdf(z_score) / (1 - confidence_level))
+            
             cvar_dollar = position_size_usd * cvar_percent
 
-            # --- DISPLAY ---
+            # --- DISPLAY (MOVED OUTSIDE THE LOOP) ---
             current_price = history['Close'].iloc[-1]
             st.markdown(f"### RISK ANALYSIS: {symbol.upper()}")
             
@@ -134,7 +138,7 @@ def calculate_market_risk(symbol, position_size_usd):
             # Volatility
             st.subheader("1. Volatility Profile")
             v1, v2, v3 = st.columns(3)
-            v1.metric("Total Volatility", f"{annual_vol:.2%}")
+            v1.metric("Total Volatility (Ann.)", f"{annual_vol:.2%}")
             v2.metric("Upside Volatility", f"{annual_upside_vol:.2%}", delta="Potential")
             v3.metric("Downside Volatility", f"{annual_downside_vol:.2%}", delta="-Risk", delta_color="inverse")
             
@@ -144,7 +148,9 @@ def calculate_market_risk(symbol, position_size_usd):
             st.subheader("2. Risk Scenarios (95% Confidence)")
             r1, r2 = st.columns(2)
             r1.error(f"**VaR (Limit Loss)**\n\n${one_day_var_dollar:,.2f}")
-            r2.error(f"**CVaR (Expected Crash)**\n\n${abs(cvar_dollar):,.2f}")
+            r2.error(f"**CVaR (Expected Crash)**\n\n${cvar_dollar:,.2f}")
+            
+            st.info(f"The Sortino Ratio is **{sortino_ratio:.2f}**")
 
             # Plot
             plot_graph(returns, one_day_var_percent, symbol)

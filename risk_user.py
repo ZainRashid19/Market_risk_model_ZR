@@ -69,28 +69,48 @@ def calculate_market_risk(symbol, position_size_usd):
                 st.error(f"❌ No data found for {symbol}")
                 return
 
-            # Calculations
-            history['Log_Returns'] = np.log(history['Close']/history['Close'].shift(1))
-            returns = history['Log_Returns'].dropna()
+            #Volatility formula
+        history['Log_Returns'] = np.log(history['Close']/history['Close'].shift(1))
+        returns = history['Log_Returns'].dropna()
 
-            daily_vol = returns.std()
-            annual_vol = daily_vol * np.sqrt(252)
-            
-            neg_returns = returns[returns <= 0]
-            daily_downside_vol = np.sqrt(np.mean(neg_returns**2))
-            annual_downside_vol = daily_downside_vol * np.sqrt(252)
+        daily_vol = returns.std()
+        weekly_vol = daily_vol * np.sqrt(5)
+        annual_vol = daily_vol * np.sqrt(252)
+        # 252 is std # of trading days in the US Stock market
 
-            # Sortino
-            avg_daily_returns = returns.mean()
-            annual_returns = avg_daily_returns * 252
-            sortino_ratio = annual_returns / annual_downside_vol
-            
-            # VaR
-            z_score = norm.ppf(0.95)
-            one_day_var_percent = daily_vol * z_score
-            one_day_var_dollar = position_size_usd * one_day_var_percent
-            
-            # CVaR
+        # calculating the neg returns of the stock
+        negative_returns = returns.copy()
+        #ignores pos days 
+        negative_returns[negative_returns>0]=0
+        daily_downside_vol = np.sqrt(np.mean(negative_returns**2))
+        weekly_downside_vol = daily_downside_vol * np.sqrt(5)
+        annual_downside_vol = daily_downside_vol * np.sqrt(252)
+
+
+        # calculating the pos returns of the stock
+        positive_returns = returns.copy()
+        #ignore the neg days 
+        positive_returns[positive_returns<0]=0
+        daily_upside_vol = np.sqrt(np.mean(positive_returns**2))
+        weekly_upside_vol = daily_upside_vol * np.sqrt(5)
+        annual_upside_vol = daily_upside_vol * np.sqrt(252)
+
+        #Sortino ratio 
+
+        avg_daily_returns = returns.mean()
+        annual_returns = avg_daily_returns*252
+        sortino_ratio = annual_returns/annual_downside_vol
+        
+        #95% confidence or 1.645 one tailed  z score 
+        confidence_level = 0.95 
+        z_score = norm.ppf(confidence_level)
+        
+        #VaR's
+        one_day_var_percent = daily_vol * z_score
+        one_day_var_dollar = position_size_usd * one_day_var_percent
+
+        one_day_var_percent_gain = daily_upside_vol * z_score
+        one_day_var_dollar_gain = position_size_usd * one_day_var_percent_gain 
             cutoff = -one_day_var_percent
             worst_days = returns[returns < cutoff]
             if len(worst_days) > 0:

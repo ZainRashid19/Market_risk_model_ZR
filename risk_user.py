@@ -260,10 +260,10 @@ with st.sidebar:
     input_investment = st.number_input("Investment Amount ($)", value=10000)
     #btn variable
     run_btn = st.button("Run Risk Model")
-    
-    if run_btn:
-        calculate_market_risk(input_symbol, input_investment)
-
+# 👇 DELETE ALL SPACES before this line. It must touch the left edge!
+if run_btn:
+    # 👇 Keep this indented relative to the 'if', but NOT the sidebar
+    calculate_market_risk(input_symbol, input_investment)
 
 
 

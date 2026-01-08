@@ -258,8 +258,10 @@ with st.sidebar:
     st.header("⚙️ Settings")
     input_symbol = st.text_input("Stock Ticker", value="NVDA").upper()
     input_investment = st.number_input("Investment Amount ($)", value=10000)
+    #btn variable
+    run_btn = st.button("Run Risk Model")
     
-    if st.button("Run Risk Model"):
+    if run_btn:
         calculate_market_risk(input_symbol, input_investment)
 
 

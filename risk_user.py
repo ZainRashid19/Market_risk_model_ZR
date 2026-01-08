@@ -114,7 +114,7 @@ def calculate_market_risk(symbol, position_size_usd):
             st.subheader("1. Volatility Profile")
             v1, v2, v3 = st.columns(3)
             v1.metric("Total Volatility", f"{annual_vol:.2%}")
-            v2.metric("Upside Volatility", f"{annual_vol:.2%}", delta="Potential")
+            v2.metric("Upside Volatility", f"{annual_upside_vol:.2%}", delta="Potential")
             v3.metric("Downside Volatility", f"{annual_downside_vol:.2%}", delta="-Risk", delta_color="inverse")
             
             st.divider()
